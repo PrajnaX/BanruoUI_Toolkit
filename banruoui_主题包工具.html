@@ -75,15 +75,7 @@
 
 
   /* L1 vertical collapse already uses .card.collapsed */
-  /* L2 horizontal collapse (column width shrink) */
-  .grid{grid-template-columns: var(--col-projects,280px) var(--col-selectors,1.05fr) var(--col-editor,1fr) var(--col-output,1.1fr);}
-  .grid.editor-x-collapsed{--col-editor:44px;}
-  .card.collapsed-x{min-width:44px;}
-  .card.collapsed-x .content{display:none !important;}
-  .card.collapsed-x .toolbar{display:none !important;}
-  .card.collapsed-x h2{justify-content:center;}
-  .card.collapsed-x h2 span:first-child{writing-mode:vertical-rl; text-orientation:mixed; letter-spacing:2px;}
-  .card.collapsed-x h2 .hint{display:none;}
+  .grid{grid-template-columns: var(--col-projects,280px) var(--col-selectors,1.05fr) var(--col-output,1.1fr);}
   .h2-controls{display:flex; align-items:center; gap:8px;}
   .iconbtn{border:1px solid rgba(38,48,64,.9); background:rgba(15,20,26,.85); color:var(--text);
     border-radius:10px; padding:6px 8px; cursor:pointer; font-size:12px; line-height:1; box-shadow:none;}
@@ -414,6 +406,85 @@
 
   function $(id){ return document.getElementById(id); }
 
+  // 内置示范模板
+  var DEMO_TEMPLATE = {
+    "meta": {
+      "name": "BanruoUI 最小示范模板",
+      "version": "1.0",
+      "description_zh": "一个基础的提示词分类包示例，包含画风、镜头、质量修饰词。适合快速测试工具流。",
+      "author": "BanruoUI 示例"
+    },
+    "globals": {
+      "header_en": "masterpiece, best quality, ultra detailed, high resolution",
+      "footer_en": "sharp focus, vibrant colors, cinematic lighting",
+      "negative_en": "blurry, lowres, deformed, ugly, bad anatomy, watermark"
+    },
+    "categories": [
+      {
+        "key": "art_style",
+        "title_zh": "画风",
+        "title_en": "Art Style",
+        "default_selected_ids": ["style_1"],
+        "options": [
+          {
+            "id": "style_1",
+            "label_zh": "赛博朋克",
+            "label_en": "Cyberpunk",
+            "prompt_en": "cyberpunk aesthetic, neon lights, rainy streets, holographic ads, futuristic cityscape",
+            "notes_zh": "适合夜景、科技感强的场景"
+          },
+          {
+            "id": "style_2",
+            "label_zh": "油画风格",
+            "label_en": "Oil Painting",
+            "prompt_en": "oil painting style, textured brush strokes, rich colors, classical art influence",
+            "notes_zh": "经典艺术感，适合肖像或风景"
+          }
+        ]
+      },
+      {
+        "key": "camera_angle",
+        "title_zh": "镜头角度",
+        "title_en": "Camera Angle",
+        "default_selected_ids": ["angle_1"],
+        "options": [
+          {
+            "id": "angle_1",
+            "label_zh": "广角低角度",
+            "label_en": "Wide Low Angle",
+            "prompt_en": "wide angle, low angle shot, dramatic perspective, looking up",
+            "notes_zh": "增加宏大感"
+          }
+        ]
+      },
+      {
+        "key": "quality",
+        "title_zh": "质量修饰",
+        "title_en": "Quality Enhancers",
+        "default_selected_ids": ["qual_1"],
+        "options": [
+          {
+            "id": "qual_1",
+            "label_zh": "极致细节",
+            "label_en": "Extreme Detail",
+            "prompt_en": "highly detailed, intricate, 8k, sharp focus",
+            "notes_zh": "通用提升质量"
+          }
+        ]
+      }
+    ],
+    "editor": {
+      "fields": [
+        {
+          "key": "free_desc",
+          "default": "",
+          "label_zh": "自由描述",
+          "placeholder": "额外英文描述..."
+        }
+      ]
+    }
+  };
+
   var BUILTIN_PROJECTS = {};
 var LS_PROJECTS = "banruoui_prompt_projects_v1";
   var LS_STATE = "banruoui_prompt_state_v1";
@@ -450,31 +521,6 @@ var LS_PROJECTS = "banruoui_prompt_projects_v1";
   function saveUIState(ui){
     try { localStorage.setItem(LS_UI, JSON.stringify(ui)); } catch(e){}
   }
-  
-  function applyEditorXCollapse(){
-    var ui = loadUIState();
-    ui.collapseX = ui.collapseX || {};
-    var isX = !!ui.collapseX.editor;
-    var grid = document.querySelector('.grid');
-    var editorCard = document.querySelector('.card[data-col="editor"]');
-    if (grid){
-      if (isX) grid.classList.add('editor-x-collapsed'); else grid.classList.remove('editor-x-collapsed');
-    }
-    if (editorCard){
-      if (isX) editorCard.classList.add('collapsed-x'); else editorCard.classList.remove('collapsed-x');
-      // update button icon
-      var btn = editorCard.querySelector('[data-xbtn]');
-      if (btn) btn.textContent = isX ? '⟩' : '⟨';
-      // update chevron (vertical collapse indicator) still handled by applyColumnCollapse
-    }
-  }
-  function toggleEditorXCollapse(){
-    var ui = loadUIState();
-    ui.collapseX = ui.collapseX || {};
-    ui.collapseX.editor = !ui.collapseX.editor;
-    saveUIState(ui);
-    applyEditorXCollapse();
-  }
 
   function applyColumnCollapse(){
     var ui = loadUIState();
@@ -496,7 +542,6 @@ var LS_PROJECTS = "banruoui_prompt_projects_v1";
     ui.collapsed[key] = !ui.collapsed[key];
     saveUIState(ui);
     applyColumnCollapse();
-    applyEditorXCollapse();
   }
 
   function deepClone(o){ return JSON.parse(JSON.stringify(o)); }
@@ -1162,8 +1207,6 @@ function renderOutput(){
         badge = " · 本地项目";
       }
       
-      var extra = "";
-      if (id === "__imported__" && importedProjectInfo && importedProjectInfo.fileName) extra = "来源: " + importedProjectInfo.fileName;
       items.push(
         '<div class="proj-item ' + (id===activeProjectId?'active':'') + '" data-proj="' + escAttr(id) + '">' +
           '<div class="proj-name">' + escHtml(name) + '</div>' +
@@ -1479,7 +1522,6 @@ function promptIdFromName(name){
       });
     }
     applyColumnCollapse();
-    applyEditorXCollapse();
   })();
 
   try{
@@ -1495,110 +1537,6 @@ function promptIdFromName(name){
     log("BOOT FAILED: " + (e && (e.stack||e.message||e)));
     alert("BOOT FAILED: " + (e && (e.message||e)));
   }
-})();
-
-
-(function(){
-  const btn = document.getElementById("downloadTemplateBtn");  // 匹配你的按钮 id
-  if (!btn) return;
-
-  const DEMO_FILE_NAME = "BanruoUI_prompt提示词示范模版.json";
-
-  // 内置示范模板（你可以根据需要调整内容）
-  const DEMO_TEMPLATE = {
-    "meta": {
-      "name": "BanruoUI 最小示范模板",
-      "version": "1.0",
-      "description_zh": "一个基础的提示词分类包示例，包含画风、镜头、质量修饰词。适合快速测试工具流。",
-      "author": "BanruoUI 示例"
-    },
-    "globals": {
-      "header_en": "masterpiece, best quality, ultra detailed, high resolution",
-      "footer_en": "sharp focus, vibrant colors, cinematic lighting",
-      "negative_en": "blurry, lowres, deformed, ugly, bad anatomy, watermark"
-    },
-    "categories": [
-      {
-        "key": "art_style",
-        "title_zh": "画风",
-        "title_en": "Art Style",
-        "default_selected_ids": ["style_1"],
-        "options": [
-          {
-            "id": "style_1",
-            "label_zh": "赛博朋克",
-            "label_en": "Cyberpunk",
-            "prompt_en": "cyberpunk aesthetic, neon lights, rainy streets, holographic ads, futuristic cityscape",
-            "notes_zh": "适合夜景、科技感强的场景"
-          },
-          {
-            "id": "style_2",
-            "label_zh": "油画风格",
-            "label_en": "Oil Painting",
-            "prompt_en": "oil painting style, textured brush strokes, rich colors, classical art influence",
-            "notes_zh": "经典艺术感，适合肖像或风景"
-          }
-        ]
-      },
-      {
-        "key": "camera_angle",
-        "title_zh": "镜头角度",
-        "title_en": "Camera Angle",
-        "default_selected_ids": ["angle_1"],
-        "options": [
-          {
-            "id": "angle_1",
-            "label_zh": "广角低角度",
-            "label_en": "Wide Low Angle",
-            "prompt_en": "wide angle, low angle shot, dramatic perspective, looking up",
-            "notes_zh": "增加宏大感"
-          }
-        ]
-      },
-      {
-        "key": "quality",
-        "title_zh": "质量修饰",
-        "title_en": "Quality Enhancers",
-        "default_selected_ids": ["qual_1"],
-        "options": [
-          {
-            "id": "qual_1",
-            "label_zh": "极致细节",
-            "label_en": "Extreme Detail",
-            "prompt_en": "highly detailed, intricate, 8k, sharp focus",
-            "notes_zh": "通用提升质量"
-          }
-        ]
-      }
-    ],
-    "editor": {
-      "fields": [
-        {
-          "key": "free_desc",
-          "default": "",
-          "label_zh": "自由描述",
-          "placeholder": "额外英文描述..."
-        }
-      ]
-    }
-  };
-
-  btn.addEventListener("click", function(){
-    // 直接下载内置模板
-    const text = JSON.stringify(DEMO_TEMPLATE, null, 2);
-    const blob = new Blob([text], {type: "application/json;charset=utf-8"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = DEMO_FILE_NAME;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-
-    setProjStatus("已下载内置示范模板","ok");
-    setSaveStatus("示范模板已下载，可直接导入测试","ok");
-  });
 })();
 
 </script>
