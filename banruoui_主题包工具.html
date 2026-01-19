@@ -777,32 +777,40 @@ function renderSelectors(){
   }
 
   function composeOutput(){
-    if (!pack) return "";
-    var parts=[];
-    if (pack.globals && pack.globals.header_en) parts.push(pack.globals.header_en);
-    for (var i=0;i<pack.categories.length;i++){
-      var c=pack.categories[i];
-      var o=getOption(c.key, state.selected[c.key]);
-      if (o && o.prompt_en) parts.push(o.prompt_en);
+  if (!pack) return "";
+  var parts=[];
+  
+  // 1. 首先：自由描述（放在最上面）
+  if (state.free && state.free.free_desc) {
+    var v = (state.free.free_desc || "").replace(/^\s+|\s+$/g, "");
+    if (v) {
+      parts.push(v);
     }
-    
-    // 修复：自由描述正确从 state.free 读取（原版错读了 state.editor）
-    if (state.free && state.free.free_desc) {
-      var v = (state.free.free_desc || "").replace(/^\s+|\s+$/g, "");
-      if (v) {
-        parts.push(v);
-      }
-    }
-    
-    if (pack.globals && pack.globals.footer_en) parts.push(pack.globals.footer_en);
-    if (pack.globals && pack.globals.negative_en && pack.globals.negative_en.replace(/^\s+|\s+$/g,"")) {
-      parts.push("Negative prompt: " + pack.globals.negative_en.replace(/^\s+|\s+$/g,""));
-    }
-    var out=parts.join("\n\n");
-    if (state.dedup) out=dedupLines(out);
-    if (state.clean) out=cleanBlankLines(out);
-    return out;
   }
+  
+  // 2. 其次：全局头部
+  if (pack.globals && pack.globals.header_en) parts.push(pack.globals.header_en);
+  
+  // 3. 然后：各个分类的提示词
+  for (var i=0;i<pack.categories.length;i++){
+    var c=pack.categories[i];
+    var o=getOption(c.key, state.selected[c.key]);
+    if (o && o.prompt_en) parts.push(o.prompt_en);
+  }
+  
+  // 4. 全局尾部
+  if (pack.globals && pack.globals.footer_en) parts.push(pack.globals.footer_en);
+  
+  // 5. 负向提示词
+  if (pack.globals && pack.globals.negative_en && pack.globals.negative_en.replace(/^\s+|\s+$/g,"")) {
+    parts.push("Negative prompt: " + pack.globals.negative_en.replace(/^\s+|\s+$/g,""));
+  }
+  
+  var out=parts.join("\n\n");
+  if (state.dedup) out=dedupLines(out);
+  if (state.clean) out=cleanBlankLines(out);
+  return out;
+}
 
   
   function closeAllInlineEditors(){
