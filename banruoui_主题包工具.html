@@ -1,0 +1,1378 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>BanruoUI工具流</title>
+<style>
+  :root {
+    --bg:#0b0d10; --border:#263040;
+    --text:#e7eefc; --muted:#9aa7bd; --accent:#6aa3ff; --bad:#ff6a6a; --ok:#7dffb2;
+    --shadow:0 12px 30px rgba(0,0,0,.35); --radius:16px;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;
+    --sans:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:
+    radial-gradient(1200px 600px at 20% 0%, rgba(106,163,255,.18), transparent 60%),
+    radial-gradient(900px 500px at 80% 10%, rgba(255,106,106,.10), transparent 55%),
+    var(--bg);
+    color:var(--text); font-family:var(--sans);}
+  header{padding:14px 18px 10px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;}
+  .brand{display:flex; align-items:center; gap:10px; padding:10px 14px; background:rgba(17,22,29,.75);
+    border:1px solid var(--border); border-radius:999px; box-shadow:var(--shadow);}
+  .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 6px rgba(106,163,255,.16);}
+  .title{font-weight:700;letter-spacing:.2px}
+  .sub{color:var(--muted);font-size:12px}
+  button,.file{border:1px solid var(--border); background:rgba(17,22,29,.75); color:var(--text);
+    border-radius:12px; padding:10px 12px; cursor:pointer; box-shadow:var(--shadow);
+    transition:transform .06s ease,border-color .15s ease; font-size:13px}
+  button:hover,.file:hover{border-color:rgba(106,163,255,.55)}
+  button:active{transform:translateY(1px)}
+  .file input{display:none}
+  main{padding:10px 18px 18px; height:calc(100% - 64px);}
+  .grid{height:100%; display:grid; gap:12px;}
+  .card{height:100%; background:rgba(17,22,29,.70); border:1px solid var(--border);
+    border-radius:var(--radius); box-shadow:var(--shadow);
+    display:flex; flex-direction:column; min-height:0;}
+  .card h2{margin:0; padding:12px 14px; border-bottom:1px solid rgba(38,48,64,.7);
+    font-size:13px; letter-spacing:.2px; display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .hint{color:var(--muted); font-weight:500; font-size:12px}
+  .content{padding:12px 14px; overflow-y:auto; overflow-x:hidden; min-height:0; flex:1;}
+  .field{display:flex; flex-direction:column; gap:6px; width:100%; margin-bottom:12px}
+  label{color:var(--muted); font-size:12px; display:flex; justify-content:space-between; gap:8px}
+  label .en{color:#b9c6dd; font-family:var(--mono); font-size:11px; opacity:.9}
+  select,textarea,input[type="text"]{width:100%; padding:10px; border-radius:12px;
+    border:1px solid rgba(38,48,64,.9); background:rgba(15,20,26,.85); color:var(--text); outline:none}
+  textarea{min-height:86px; resize:vertical; font-family:var(--mono); font-size:12px; line-height:1.35}
+  .output{font-family:var(--mono); background:rgba(15,20,26,.85); border:1px solid rgba(38,48,64,.9);
+    border-radius:12px; padding:12px; white-space:pre-wrap; min-height:220px; overflow:auto}
+  .kv{display:flex; align-items:center; gap:10px; flex-wrap:wrap; color:var(--muted); font-size:12px}
+  .kv code{font-family:var(--mono); color:#cfe0ff; background:rgba(106,163,255,.10);
+    border:1px solid rgba(106,163,255,.20); padding:2px 6px; border-radius:999px}
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  .toolbar{display:flex; gap:10px; flex-wrap:wrap; align-items:center; padding:10px 14px;
+    border-top:1px solid rgba(38,48,64,.7)}
+  .toolbar .spacer{flex:1}
+  .status{font-size:12px; color:var(--muted)}
+  .status.ok{color:var(--ok)} .status.bad{color:var(--bad)}
+  .warn{border:1px dashed rgba(255,106,106,.35); background:rgba(255,106,106,.06); color:#ffd0d0;
+    padding:10px 12px; border-radius:12px; font-size:12px}
+  .proj-item{padding:10px 10px; border:1px solid rgba(38,48,64,.8); border-radius:12px;
+    background:rgba(15,20,26,.65); cursor:pointer; display:flex; flex-direction:column; gap:4px}
+  .proj-item:hover{border-color:rgba(106,163,255,.55)}
+  .proj-item.active{border-color:rgba(106,163,255,.85); box-shadow:0 0 0 3px rgba(106,163,255,.16)}
+  .proj-name{font-weight:700; font-size:13px}
+  .proj-meta{color:var(--muted); font-size:12px}
+  
+  @media (max-width: 1280px){ main{height:auto} .grid{grid-template-columns: 1fr; height:auto} .card{height:auto} }
+
+  .card.collapsed .content{display:none !important;}
+  .card.collapsed .toolbar{display:none !important;}
+  .card h2{cursor:pointer; user-select:none;}
+  .card h2 .chev{opacity:.8; font-size:12px; font-family:var(--mono);}
+
+
+  /* L1 vertical collapse already uses .card.collapsed */
+  /* L2 horizontal collapse (column width shrink) */
+  .grid{grid-template-columns: var(--col-projects,280px) var(--col-selectors,1.05fr) var(--col-editor,1fr) var(--col-output,1.1fr);}
+  .grid.editor-x-collapsed{--col-editor:44px;}
+  .card.collapsed-x{min-width:44px;}
+  .card.collapsed-x .content{display:none !important;}
+  .card.collapsed-x .toolbar{display:none !important;}
+  .card.collapsed-x h2{justify-content:center;}
+  .card.collapsed-x h2 span:first-child{writing-mode:vertical-rl; text-orientation:mixed; letter-spacing:2px;}
+  .card.collapsed-x h2 .hint{display:none;}
+  .h2-controls{display:flex; align-items:center; gap:8px;}
+  .iconbtn{border:1px solid rgba(38,48,64,.9); background:rgba(15,20,26,.85); color:var(--text);
+    border-radius:10px; padding:6px 8px; cursor:pointer; font-size:12px; line-height:1; box-shadow:none;}
+  .iconbtn:hover{border-color:rgba(106,163,255,.55);}
+  .panel{border:1px solid rgba(38,48,64,.8); background:rgba(15,20,26,.55); border-radius:12px; margin-bottom:12px; overflow:hidden;}
+  .panel-h{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 10px; cursor:pointer; user-select:none;}
+  .panel-h .t{font-size:12px; color:var(--muted);}
+  .panel-h .t .en{font-family:var(--mono); color:#b9c6dd; font-size:11px; opacity:.9; margin-left:8px;}
+  .panel-h .chev{font-family:var(--mono); opacity:.85;}
+  .panel-b{padding:0 10px 10px;}
+  .panel.collapsed .panel-b{display:none;}
+
+
+  
+  /* Inline editor color cues (Edit vs Add) - brighter but consistent */
+  .inline-editor.editing .panel{
+    border-color: rgba(130,185,255,.75);
+    box-shadow:
+      0 0 0 1px rgba(130,185,255,.20) inset,
+      0 0 24px rgba(40,90,160,.18);
+    background: rgba(26,46,78,.55);
+  }
+  .inline-editor.adding .panel{
+    border-color: rgba(130,255,195,.75);
+    box-shadow:
+      0 0 0 1px rgba(130,255,195,.18) inset,
+      0 0 26px rgba(40,160,95,.18);
+    background: rgba(18,64,40,.55);
+  }
+
+  /* Make each inner drawer (panel) header slightly brighter for readability */
+  .inline-editor .panel-h{
+    background: rgba(255,255,255,.04);
+  }
+  .inline-editor.editing .panel-h{
+    background: rgba(130,185,255,.08);
+  }
+  .inline-editor.adding .panel-h{
+    background: rgba(130,255,195,.08);
+  }
+
+  /* Left accent bar for quick recognition */
+  .inline-editor.editing .panel{
+    position: relative;
+  }
+  .inline-editor.editing .panel:before{
+    content:"";
+    position:absolute; left:0; top:0; bottom:0; width:4px;
+    background: rgba(130,185,255,.70);
+  }
+  .inline-editor.adding .panel{
+    position: relative;
+  }
+  .inline-editor.adding .panel:before{
+    content:"";
+    position:absolute; left:0; top:0; bottom:0; width:4px;
+    background: rgba(130,255,195,.70);
+  }
+
+  .inline-editor .mode-badge{
+    display:inline-block; padding:2px 8px; border-radius:999px;
+    font-size:11px; font-family:var(--mono); opacity:.98;
+    background: rgba(0,0,0,.22);
+  }
+  .inline-editor.editing .mode-badge{
+    border:1px solid rgba(130,185,255,.65);
+    color:#cfe4ff;
+  }
+  .inline-editor.adding .mode-badge{
+    border:1px solid rgba(130,255,195,.60);
+    color:#d2ffe6;
+  }
+
+  .inline-editor.editing .mode-badge{border:1px solid rgba(106,163,255,.45); color:#bcd6ff;}
+  .inline-editor.adding .mode-badge{border:1px solid rgba(120,255,180,.35); color:#bfffd5;}
+
+
+  /* Active state for module buttons (match inline editor cues) */
+  button.btn-active-edit{
+    border-color: rgba(130,185,255,.75) !important;
+    box-shadow: 0 0 0 1px rgba(130,185,255,.18) inset, 0 0 18px rgba(40,90,160,.14);
+    background: rgba(26,46,78,.55);
+    color: #e6f1ff;
+  }
+  button.btn-active-add{
+    border-color: rgba(130,255,195,.75) !important;
+    box-shadow: 0 0 0 1px rgba(130,255,195,.16) inset, 0 0 18px rgba(40,160,95,.14);
+    background: rgba(18,64,40,.55);
+    color: #eafff3;
+  }
+
+
+  /* Make category titles (e.g., 画风/镜头) more prominent */
+  .field > label{
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: .2px;
+  }
+  .field > label .en{
+    font-size: 12px;
+    font-weight: 600;
+    opacity: .75;
+    margin-left: 6px;
+  }
+
+
+  /* Free fields: keep layout stable, textarea scroll instead of expanding */
+  textarea.free-desc{
+    height: 140px;
+    max-height: 220px;
+    overflow: auto;
+    resize: none;
+  }
+
+
+  /* Make scrollbars visible and consistent (Chromium/Edge) */
+  .content::-webkit-scrollbar{width:10px;}
+  .content::-webkit-scrollbar-track{background:rgba(255,255,255,0.03); border-radius:8px;}
+  .content::-webkit-scrollbar-thumb{background:rgba(120,160,220,0.28); border:2px solid rgba(0,0,0,0); background-clip:padding-box; border-radius:8px;}
+  .content::-webkit-scrollbar-thumb:hover{background:rgba(120,160,220,0.38); border:2px solid rgba(0,0,0,0); background-clip:padding-box;}
+
+
+  /* Always show scrollbars for project list & selectors area so it's obvious (even if not overflowing) */
+  #projects.content{overflow-y: scroll;}
+  #selectors.content{overflow-y: scroll;}
+
+
+  /* Topbar layout: left actions + centered title */
+  header.topbar{display:flex; align-items:center; gap:14px}
+  header.topbar .actions{margin-left:0}
+  header.topbar .brandCenter{
+    flex:1;
+    text-align:center;
+    font-weight:800;
+    letter-spacing:.6px;
+    font-size:18px;
+    color:var(--text);
+    text-shadow:0 2px 18px rgba(0,0,0,.55);
+    user-select:none;
+  }
+  header.topbar .actionsRight{width:1px}
+
+  /* Debug drawer (bottom-left), hidden by default, click to expand */
+  #br_debug_drawer{position:fixed; left:12px; bottom:12px; z-index:99999; width:min(520px, calc(100vw - 24px));}
+  .dbg-toggle{
+    display:inline-flex; align-items:center; gap:8px;
+    background:rgba(0,0,0,.55);
+    border:1px solid rgba(255,255,255,.18);
+    color:rgba(255,255,255,.88);
+    border-radius:12px;
+    padding:8px 12px;
+    cursor:pointer;
+    font-weight:700;
+  }
+  .dbg-panel{
+    margin-top:8px;
+    background:rgba(0,0,0,.55);
+    border:1px solid rgba(255,255,255,.18);
+    border-radius:12px;
+    overflow:auto;
+    max-height:38vh;
+    padding:10px 12px;
+    display:none;
+  }
+  .dbg-head{color:rgba(255,255,255,.85); margin-bottom:6px}
+  #br_debug_drawer.dbg-open .dbg-panel{display:block}
+  #br_debug_drawer.dbg-open .dbg-toggle{background:rgba(10,18,30,.68); border-color:rgba(106,163,255,.42)}
+
+
+  /* Projects header right controls */
+  h2{display:flex; align-items:center; gap:10px; flex-wrap:nowrap}
+  h2 .hint{opacity:.75; font-weight:600; margin-left:10px; white-space:nowrap}
+  .h2right{margin-left:auto; display:flex; align-items:center; gap:8px}
+  .miniBtn{
+    padding:6px 10px;
+    border-radius:10px;
+    font-size:12px;
+    line-height:1;
+    background:rgba(255,255,255,0.04);
+    border:1px solid rgba(255,255,255,0.14);
+    color:rgba(255,255,255,0.9);
+    cursor:pointer;
+  }
+  .miniBtn:hover{border-color:rgba(106,163,255,.55)}
+  .miniBtn.danger{border-color: rgba(255,106,106,.35);}
+  .miniBtn.danger:hover{border-color: rgba(255,106,106,.65);}
+  /* Make chevron a bit separated */
+  .chev{margin-left:6px}
+
+
+  /* Context menu (projects) */
+  .ctx{position:fixed; z-index:9999; min-width:160px; padding:8px; border-radius:12px;
+       background:rgba(10,14,22,.95); border:1px solid rgba(106,163,255,.25);
+       box-shadow:0 20px 60px rgba(0,0,0,.55); backdrop-filter: blur(10px);}
+  .ctx.hidden{display:none;}
+  .ctx-item{width:100%; text-align:left; padding:10px 10px; border-radius:10px;
+            background:transparent; border:1px solid transparent; color:rgba(255,255,255,.92);
+            cursor:pointer; font-size:13px; font-weight:650;}
+  .ctx-item:hover{background:rgba(106,163,255,.10); border-color:rgba(106,163,255,.22);}
+  .ctx-item.danger:hover{background:rgba(255,106,106,.10); border-color:rgba(255,106,106,.22);}
+  .ctx-item:disabled{opacity:.45; cursor:not-allowed;}
+
+
+  /* Free description: remove title text and outer border */
+  #free_fields_panel{
+    border:none !important;
+    background:transparent !important;
+    box-shadow:none !important;
+    padding:0 !important;
+  }
+  #free_fields_head{
+    border:none !important;
+    background:transparent !important;
+    padding:0 0 6px 0 !important;
+    min-height:18px !important;
+  }
+  #free_fields_head .t{display:none !important;}
+  #free_fields_head .chev{
+    margin-left:auto;
+    opacity:.75;
+  }
+  #free_fields_body{
+    padding:0 !important;
+  }
+  /* Ensure textarea itself still looks consistent */
+  #free_fields_body textarea{
+    min-height:120px;
+    resize:vertical;
+  }
+
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="row actions">
+    <label class="file">导入 JSON <input id="fileInput" type="file" accept=".json,application/json"/></label>
+    <button id="downloadTemplateBtn">下载示范模板</button>
+    <button id="saveProjectBtn">保存为项目</button>
+    <button id="exportBtn">导出 JSON</button>
+  </div>
+  <div class="brandCenter">BanruoUI工具流</div>
+  <div class="row actionsRight"></div>
+</header>
+
+<main>
+  <div class="grid">
+    <section class="card" data-col="projects">
+    <button id="renameProjectBtn" style="display:none"></button>
+    <button id="deleteProjectBtn" style="display:none"></button>
+
+      <h2><span>项目管理</span><span class="hint">右键：载入 / 重命名 / 删除</span><span class="chev" data-chev>▾</span></h2>
+      <div class="content" id="projects"></div>
+      <div class="toolbar">
+        <span class="status" id="projStatus">就绪</span>
+        <span class="spacer"></span>
+        </div>
+    </section>
+
+    <section class="card" data-col="selectors">
+      <h2><span>选择区</span><span class="hint">显示中英对照</span><span class="chev" data-chev>▾</span></h2>
+      <div class="content" id="selectors"></div>
+      <div class="toolbar">
+        <span class="status" id="saveStatus">未保存</span>
+        <span class="spacer"></span>
+        <button id="saveLocalBtn">保存本地状态</button>
+        <button id="loadLocalBtn">载入本地状态</button>
+        <button id="clearLocalBtn">清空本地</button>
+      </div>
+    </section>
+
+    <section class="card" data-col="output">
+      <h2><span>输出区</span><span class="hint">纯英文（可复制）</span><span class="chev" data-chev>▾</span></h2>
+      <div class="content">
+        <div class="field">
+          <label>最终 Prompt（English Only） <span class="en">preview</span></label>
+          <div id="output" class="output"></div>
+        </div>
+        <div class="kv">
+          <span>去重：</span><code id="dedupState">ON</code>
+          <span>清理空行：</span><code id="cleanState">ON</code>
+        </div>
+        <div style="height:10px"></div>
+        <div class="row">
+          <button id="copyBtn">复制输出</button>
+          <button id="toggleDedupBtn">切换去重</button>
+          <button id="toggleCleanBtn">切换清理空行</button>
+        </div>
+        <div style="height:12px"></div>
+        <div class="sub">中文备注不会进入输出；所有进入输出的文本均为英文。</div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<div id="br_debug_drawer" class="dbg-collapsed">
+  <button id="dbgToggle" class="dbg-toggle" title="展开/收起调试信息">DEBUG ▲</button>
+  <div id="br_debug_overlay" class="dbg-panel">
+    <div class="dbg-head"><b>DEBUG</b> : JS loaded ✅</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  function log(msg){
+    try{
+      var o=document.getElementById("br_debug_overlay");
+      var d=document.createElement("div");
+      d.textContent=msg;
+      o.appendChild(d);
+      o.scrollTop=o.scrollHeight;
+    }catch(e){}
+  }
+
+  // Debug drawer toggle
+  try{
+    var t=document.getElementById("dbgToggle");
+    var drawer=document.getElementById("br_debug_drawer");
+    if(t && drawer){
+      t.addEventListener("click", function(){
+        var open = drawer.classList.toggle("dbg-open");
+        t.textContent = open ? "DEBUG ▼" : "DEBUG ▲";
+      });
+    }
+  }catch(e){}
+  window.addEventListener("error", function(ev){
+    log("JS ERROR: " + (ev.message || "unknown") + " @ " + (ev.filename||"") + ":" + (ev.lineno||0) + ":" + (ev.colno||0));
+  });
+
+  function $(id){ return document.getElementById(id); }
+
+  var BUILTIN_PROJECTS = {};
+var LS_PROJECTS = "banruoui_prompt_projects_v1";
+  var LS_STATE = "banruoui_prompt_state_v1";
+  var LS_UI = "banruoui_prompt_ui_v1";
+  var importedProject = null; // 临时导入项目（未保存）
+  var importedProjectInfo = null; // {fileName, importedAt}
+
+  var projectsEl = $("projects");
+  var selectorsEl = $("selectors");
+  var outputEl = $("output");
+  var fileInput = $("fileInput");
+  var saveStatus = $("saveStatus");
+  var projStatus = $("projStatus");
+
+  var pack = null;
+  var state = { selected: {}, editor: {}, dedup: true, clean: true };
+  var editing = { categoryKey: null, optionId: null };
+  var activeProjectId = null;
+
+  function setStatus(el, text, cls){
+    el.textContent = text;
+    el.classList.remove("ok"); el.classList.remove("bad");
+    if (cls) el.classList.add(cls);
+  }
+  function setSaveStatus(text, cls){ setStatus(saveStatus, text, cls); }
+  function setProjStatus(text, cls){ setStatus(projStatus, text, cls); }
+
+
+  function loadUIState(){
+    var s = localStorage.getItem(LS_UI);
+    if (!s) return { collapsed: {}, collapseX: {}, editorPanelsCollapsed: {} };
+    try { return JSON.parse(s) || { collapsed: {}, collapseX: {}, editorPanelsCollapsed: {} }; } catch(e){ return { collapsed: {}, collapseX: {}, editorPanelsCollapsed: {} }; }
+  }
+  function saveUIState(ui){
+    try { localStorage.setItem(LS_UI, JSON.stringify(ui)); } catch(e){}
+  }
+  
+  function applyEditorXCollapse(){
+    var ui = loadUIState();
+    ui.collapseX = ui.collapseX || {};
+    var isX = !!ui.collapseX.editor;
+    var grid = document.querySelector('.grid');
+    var editorCard = document.querySelector('.card[data-col="editor"]');
+    if (grid){
+      if (isX) grid.classList.add('editor-x-collapsed'); else grid.classList.remove('editor-x-collapsed');
+    }
+    if (editorCard){
+      if (isX) editorCard.classList.add('collapsed-x'); else editorCard.classList.remove('collapsed-x');
+      // update button icon
+      var btn = editorCard.querySelector('[data-xbtn]');
+      if (btn) btn.textContent = isX ? '⟩' : '⟨';
+      // update chevron (vertical collapse indicator) still handled by applyColumnCollapse
+    }
+  }
+  function toggleEditorXCollapse(){
+    var ui = loadUIState();
+    ui.collapseX = ui.collapseX || {};
+    ui.collapseX.editor = !ui.collapseX.editor;
+    saveUIState(ui);
+    applyEditorXCollapse();
+  }
+
+  function applyColumnCollapse(){
+    var ui = loadUIState();
+    var collapsed = (ui && ui.collapsed) ? ui.collapsed : {};
+    var cards = document.querySelectorAll('.card[data-col]');
+    for (var i=0;i<cards.length;i++){
+      var c = cards[i];
+      var key = c.getAttribute('data-col');
+      var isCol = !!collapsed[key];
+      if (isCol) c.classList.add('collapsed'); else c.classList.remove('collapsed');
+      // update chevron
+      var chev = c.querySelector('[data-chev]');
+      if (chev) chev.textContent = isCol ? '▸' : '▾';
+    }
+  }
+  function toggleColumnCollapse(key){
+    var ui = loadUIState();
+    ui.collapsed = ui.collapsed || {};
+    ui.collapsed[key] = !ui.collapsed[key];
+    saveUIState(ui);
+    applyColumnCollapse();
+    applyEditorXCollapse();
+  }
+
+  function deepClone(o){ return JSON.parse(JSON.stringify(o)); }
+
+  function validatePack(p){
+    if (!p || typeof p !== "object") return "JSON 不是对象";
+    if (!p.meta || !p.categories) return "缺少 meta 或 categories";
+    if (!Array.isArray(p.categories) || p.categories.length === 0) return "categories 为空";
+    if (!p.globals) p.globals = {header_en:"", footer_en:"", negative_en:""};
+    if (typeof p.globals.header_en !== "string") p.globals.header_en = "";
+    if (typeof p.globals.footer_en !== "string") p.globals.footer_en = "";
+    if (typeof p.globals.negative_en !== "string") p.globals.negative_en = "";
+    for (var i=0;i<p.categories.length;i++){
+      var c=p.categories[i];
+      if (!c.key || !Array.isArray(c.options)) return "分类缺少 key/options: " + (c.title_zh || c.key || "unknown");
+      if (c.options.length===0) return "分类 options 为空: " + (c.title_zh || c.key);
+      var ids={};
+      for (var j=0;j<c.options.length;j++){
+        var o=c.options[j];
+        if (!o.id || !o.label_zh || !o.label_en || !o.prompt_en) return "选项字段不完整: " + c.key;
+        if (ids[o.id]) return "重复 option id: " + o.id;
+        ids[o.id]=true;
+      }
+    }
+    return null;
+  }
+
+  function escHtml(s){
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+  function escAttr(s){
+    return escHtml(s).replace(/"/g,"&quot;");
+  }
+
+  function getCategory(key){
+    for (var i=0;i<pack.categories.length;i++) if (pack.categories[i].key===key) return pack.categories[i];
+    return null;
+  }
+  function getOption(catKey, optId){
+    var c=getCategory(catKey);
+    if (!c) return null;
+    for (var i=0;i<c.options.length;i++) if (c.options[i].id===optId) return c.options[i];
+    return null;
+  }
+
+  function initFromPack(p){
+    pack = p;
+    state.selected = {};
+    for (var i=0;i<pack.categories.length;i++){
+      var c=pack.categories[i];
+      var def = (c.default_selected_ids && c.default_selected_ids[0]) ? c.default_selected_ids[0] : c.options[0].id;
+      state.selected[c.key]=def;
+    }
+    state.editor = {};
+    var fields = (pack.editor && Array.isArray(pack.editor.fields)) ? pack.editor.fields : [];
+    for (var k=0;k<fields.length;k++){
+      var f=fields[k];
+      state.editor[f.key] = f["default"] || "";
+    }
+    editing={categoryKey:null, optionId:null, mode:null};
+    renderProjects();
+    renderSelectors();
+    if (editing.categoryKey) { renderInlineEditor(editing.categoryKey); }
+    renderOutput();
+    setSaveStatus("就绪","ok");
+    log("BOOT: ok");
+  }
+
+  function optionLabel(o){ return o.label_zh + " (" + o.label_en + ")"; }
+
+  
+  function updateModuleButtonActiveState(){
+    // highlight the module buttons for the currently opened inline editor
+    try{
+      var editBtns = selectorsEl.querySelectorAll('button[data-edit]');
+      for (var i=0;i<editBtns.length;i++){
+        var cat = editBtns[i].getAttribute('data-edit');
+        if (editing.categoryKey===cat && editing.mode==="edit") editBtns[i].classList.add('btn-active-edit');
+        else editBtns[i].classList.remove('btn-active-edit');
+      }
+      var addBtns = selectorsEl.querySelectorAll('button[data-add]');
+      for (var j=0;j<addBtns.length;j++){
+        var cat2 = addBtns[j].getAttribute('data-add');
+        if (editing.categoryKey===cat2 && editing.mode==="add") addBtns[j].classList.add('btn-active-add');
+        else addBtns[j].classList.remove('btn-active-add');
+      }
+    }catch(e){}
+  }
+
+function renderSelectors(){
+    if (!pack) { selectorsEl.innerHTML = '<div class="warn">请先载入一个项目或导入 JSON。</div>'; return; }
+    var htmlParts=[];
+
+    // 自由描述（全局编辑，属于选择区的子区域）——放在最上方（画风/镜头之前）
+    htmlParts.push(
+      '<div class="panel" id="free_fields_panel">' +
+        '<div class="panel-h" id="free_fields_head">' +
+          '<div class="t"></div>' +
+          '<div class="chev" id="free_fields_chev">▾</div>' +
+        '</div>' +
+        '<div class="panel-b" id="free_fields_body"></div>' +
+      '</div>'
+    );
+
+    for (var i=0;i<pack.categories.length;i++){
+      var c=pack.categories[i];
+      var selId=state.selected[c.key];
+      var opts=[];
+      for (var j=0;j<c.options.length;j++){
+        var o=c.options[j];
+        opts.push('<option value="' + escAttr(o.id) + '"' + (o.id===selId?' selected':'') + '>' + escHtml(optionLabel(o)) + '</option>');
+      }
+      htmlParts.push(
+        '<div class="field">' +
+          '<label>' + escHtml(c.title_zh) + ' <span class="en">' + escHtml(c.title_en||"") + '</span></label>' +
+          '<select data-cat="' + escAttr(c.key) + '">' + opts.join("") + '</select>' +
+          '<div class="kv">' +
+            '<button type="button" data-edit="' + escAttr(c.key) + '">编辑</button>' +
+            '<button type="button" data-add="' + escAttr(c.key) + '">新增</button>' +
+            '<button type="button" data-del="' + escAttr(c.key) + '" style="border-color: rgba(255,106,106,.35);">删除</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="inline-editor" id="inline_editor_' + escAttr(c.key) + '" style="display:none;"></div>'
+      );
+    }
+
+    // 自由字段（全局编辑，属于选择区的子区域）
+    htmlParts.push(
+      '<div class="panel" id="free_fields_panel">' +
+        '<div class="panel-h" id="free_fields_head">' +
+          '<div class="t"></div>' +
+          '<div class="chev" id="free_fields_chev">▾</div>' +
+        '</div>' +
+        '<div class="panel-b" id="free_fields_body"></div>' +
+      '</div>'
+    );
+
+    selectorsEl.innerHTML = htmlParts.join("");
+
+    // bind selects
+    var selects = selectorsEl.querySelectorAll("select[data-cat]");
+    for (var s=0;s<selects.length;s++){
+      selects[s].addEventListener("change", function(e){
+        var cat=this.getAttribute("data-cat");
+        state.selected[cat]=this.value;
+
+        // 如果正在编辑该模块：
+        // - edit 模式：随选择变化重新载入草稿（副本）
+        // - add 模式：保持当前草稿不变（避免误覆盖）
+        if (editing && editing.categoryKey === cat){
+          if (editing.mode === "edit"){
+            editing.optionId = this.value;
+            var o2 = getOption(cat, editing.optionId);
+            editing.draft = o2 ? deepClone(o2) : null;
+            renderInlineEditor(cat);
+          }
+        }
+
+        renderOutput();
+        setSaveStatus("未保存","");
+      });
+    }
+
+    // edit button toggles inline editor under that category
+    var edits = selectorsEl.querySelectorAll("button[data-edit]");
+    for (var a=0;a<edits.length;a++){
+      edits[a].addEventListener("click", function(){
+        var cat=this.getAttribute("data-edit");
+        toggleInlineEditor(cat);
+      });
+    }
+    var adds = selectorsEl.querySelectorAll("button[data-add]");
+    for (var b=0;b<adds.length;b++){
+      adds[b].addEventListener("click", function(){ startAddOption(this.getAttribute("data-add")); });
+    }
+    var dels = selectorsEl.querySelectorAll("button[data-del]");
+    for (var c2=0;c2<dels.length;c2++){
+      dels[c2].addEventListener("click", function(){ deleteSelectedOption(this.getAttribute("data-del")); });
+    }
+
+    // free fields accordion
+    var ffHead = $("free_fields_head");
+    if (ffHead){
+      ffHead.addEventListener("click", function(){
+        var ui = loadUIState(); ui = ui || {};
+        ui.freeFieldsCollapsed = !ui.freeFieldsCollapsed;
+        saveUIState(ui);
+        applyFreeFieldsCollapse();
+      });
+    }
+
+    renderFreeFields();
+    updateModuleButtonActiveState();
+    applyFreeFieldsCollapse();
+
+    // if currently editing a category, keep it open
+    if (editing.categoryKey){
+      var box = $("inline_editor_" + editing.categoryKey);
+      if (box){ box.style.display = ""; renderInlineEditor(editing.categoryKey); }
+    }
+  }  function startAddOption(catKey){
+    // 新增按钮规则（确认版）：
+    // 第一次点「新增」：展开编辑框 + 创建草稿（仅存在编辑框，不进入列表）
+    // 新增编辑框打开期间，再点一次「新增」：收起编辑框并丢弃草稿（不弹确认，不保存）
+    if (!pack) return;
+
+    // 再点一次=收起并丢弃草稿
+    if (editing.categoryKey === catKey && editing.mode === "add"){
+      closeAllInlineEditors();
+      editing = {categoryKey:null, optionId:null, mode:null, draft:null};
+      updateModuleButtonActiveState();
+      return;
+    }
+
+    // 第一次点=打开新增编辑框，创建草稿（不写入 c.options）
+    var c = getCategory(catKey);
+    if (!c) return;
+
+    closeAllInlineEditors();
+
+    editing = {
+      categoryKey: catKey,
+      optionId: null,
+      mode: "add",
+      draft: {
+        id: "", // 新增草稿不分配真实 id，直到“应用修改”
+        label_zh: "新选项",
+        label_en: "New option",
+        prompt_en: "Write your module prompt in English here.",
+        notes_zh: ""
+      }
+    };
+
+    var box = $("inline_editor_" + catKey);
+    if (box){
+      box.style.display = "";
+      renderInlineEditor(catKey);
+    }
+
+    updateModuleButtonActiveState();
+    setSaveStatus("未保存","");
+  }
+
+  function deleteSelectedOption(catKey){
+    var c=getCategory(catKey);
+    if (!c) return;
+    if (c.options.length<=1) { alert("该分类至少保留 1 个选项。"); return; }
+    var id=state.selected[catKey];
+    var idx=-1;
+    for (var i=0;i<c.options.length;i++) if (c.options[i].id===id) idx=i;
+    if (idx<0) return;
+    if (!confirm("确定删除？\n"+(c.title_zh||c.key)+" - "+c.options[idx].label_zh+" ("+c.options[idx].label_en+")")) return;
+    c.options.splice(idx,1);
+    state.selected[catKey]=c.options[0].id;
+    if (editing.categoryKey===catKey && editing.optionId===id) editing={categoryKey:null, optionId:null, mode:null};
+    renderSelectors(); if (editing.categoryKey) { renderInlineEditor(editing.categoryKey); } renderOutput();
+    setSaveStatus("未保存","");
+  }
+
+  function applyOptionEdit(){
+    var o=getOption(editing.categoryKey, editing.optionId);
+    if (!o) return;
+    var zh=document.getElementById("edit_label_zh").value.replace(/^\s+|\s+$/g,"");
+    var en=document.getElementById("edit_label_en").value.replace(/^\s+|\s+$/g,"");
+    var pe=document.getElementById("edit_prompt_en").value.replace(/^\s+|\s+$/g,"");
+    var nz=document.getElementById("edit_notes_zh").value;
+    if (!zh || !en || !pe) { alert("中文名、英文名、英文正文不能为空。"); return; }
+    o.label_zh=zh; o.label_en=en; o.prompt_en=pe; o.notes_zh=nz;
+    renderSelectors(); renderOutput();
+    setSaveStatus("未保存","");
+  }
+
+  function normalizeLines(t){
+    return String(t).split("\r\n").join("\n").split("\r").join("\n");
+  }
+  function dedupLines(text){
+    var lines=normalizeLines(text).split("\n");
+    var out=[]; var seen={};
+    for (var i=0;i<lines.length;i++){
+      var line=lines[i];
+      var key=line.replace(/^\s+|\s+$/g,"");
+      if (!key) { out.push(line); continue; }
+      var k=key.toLowerCase();
+      if (seen[k]) continue;
+      seen[k]=true;
+      out.push(line);
+    }
+    return out.join("\n");
+  }
+  function cleanBlankLines(text){
+    var t=normalizeLines(text);
+    t=t.replace(/\n{3,}/g,"\n\n");
+    var lines=t.split("\n");
+    for (var i=0;i<lines.length;i++) lines[i]=lines[i].replace(/\s+$/g,"");
+    t=lines.join("\n");
+    return t.replace(/^\s+|\s+$/g,"");
+  }
+
+  function composeOutput(){
+    if (!pack) return "";
+    var parts=[];
+    if (pack.globals && pack.globals.header_en) parts.push(pack.globals.header_en);
+    for (var i=0;i<pack.categories.length;i++){
+      var c=pack.categories[i];
+      var o=getOption(c.key, state.selected[c.key]);
+      if (o && o.prompt_en) parts.push(o.prompt_en);
+    }
+    var freeFields = [
+      { key: "free_desc",  label_zh: "自由描述", label_en: "Free description", placeholder_en: "Write extra description in English (included in output)..." }
+    ];
+    for (var j=0;j<freeFields.length;j++){
+      var f=freeFields[j];
+      var v=(state.editor[f.key]||"").replace(/^\s+|\s+$/g,"");
+      if (!v) continue;
+      parts.push(v);
+    }
+    if (pack.globals && pack.globals.footer_en) parts.push(pack.globals.footer_en);
+    if (pack.globals && pack.globals.negative_en && pack.globals.negative_en.replace(/^\s+|\s+$/g,"")) {
+      parts.push("Negative prompt: " + pack.globals.negative_en.replace(/^\s+|\s+$/g,""));
+    }
+    var out=parts.join("\n\n");
+    if (state.dedup) out=dedupLines(out);
+    if (state.clean) out=cleanBlankLines(out);
+    return out;
+  }
+
+  
+  function closeAllInlineEditors(){
+    var boxes = selectorsEl.querySelectorAll('.inline-editor[id^="inline_editor_"]');
+    for (var i=0;i<boxes.length;i++){ boxes[i].style.display="none"; boxes[i].innerHTML=""; }
+  }  function toggleInlineEditor(catKey){
+    // 编辑按钮规则：点一次展开，点一次收起；不产生其他副作用
+    if (!pack) return;
+    var box = $("inline_editor_" + catKey);
+    if (!box) return;
+
+    // 如果当前已以“编辑模式”打开同一模块：再次点击=收起并丢弃草稿
+    if (editing.categoryKey === catKey && editing.mode === "edit"){
+      closeAllInlineEditors();
+      editing = {categoryKey:null, optionId:null, mode:null, draft:null};
+      updateModuleButtonActiveState();
+      return;
+    }
+
+    // 打开编辑框：载入当前选中项副本到草稿（不直接改原数据）
+    var selectedId = state.selected[catKey];
+    var o = getOption(catKey, selectedId);
+    if (!o) return;
+
+    closeAllInlineEditors();
+
+    editing = {
+      categoryKey: catKey,
+      optionId: selectedId,
+      mode: "edit",
+      draft: deepClone(o)
+    };
+
+    box.style.display = "";
+    renderInlineEditor(catKey);
+    updateModuleButtonActiveState();
+  }  function renderInlineEditor(catKey){
+    if (!pack) return;
+    var box = $("inline_editor_" + catKey);
+    if (!box) return;
+    // Ensure mode class applies for both Edit and Add flows
+    box.className = "inline-editor " + (editing.mode==="add" ? "adding" : "editing");
+
+    var c=getCategory(catKey);
+    if (!c){ box.innerHTML = '<div class="warn">未找到模块。</div>'; return; }
+
+    // 草稿来源：
+    // - edit：editing.draft 为选中项副本
+    // - add：editing.draft 为临时草稿（不入列表）
+    var d = (editing && editing.categoryKey === catKey) ? editing.draft : null;
+    if (!d){ box.innerHTML = '<div class="warn">未找到草稿。</div>'; return; }
+
+    var showId = (editing.mode === "add") ? "(draft)" : (d.id || "");
+    var modeTag = (editing.mode === "add") ? "ADD" : "EDIT";
+
+    var top = '';
+    top += '<div class="field"><label>当前编辑模块 <span class="en">editing</span></label>' +
+           '<div class="kv"><code>' + escHtml(c.title_zh) + ' / ' + escHtml(c.title_en||"") + '</code>' +
+           '<code>' + escHtml(d.label_zh) + ' / ' + escHtml(d.label_en) + '</code>' +
+           '<code>id: ' + escHtml(showId) + '</code>' +
+           '<code class="mode-badge">' + modeTag + '</code></div></div>';
+
+    top += '<div class="field"><label>中文名 <span class="en">label_zh</span></label>' +
+           '<input type="text" id="edit_label_zh" value="' + escAttr(d.label_zh||"") + '"/></div>';
+    top += '<div class="field"><label>英文名 <span class="en">label_en</span></label>' +
+           '<input type="text" id="edit_label_en" value="' + escAttr(d.label_en||"") + '"/></div>';
+    top += '<div class="field"><label>模块英文正文（进入输出） <span class="en">prompt_en</span></label>' +
+           '<textarea id="edit_prompt_en">' + escHtml(d.prompt_en||"") + '</textarea></div>';
+    top += '<div class="field"><label>中文备注（不进入输出） <span class="en">notes_zh</span></label>' +
+           '<textarea id="edit_notes_zh">' + escHtml(d.notes_zh||"") + '</textarea></div>';
+    top += '<div class="row"><button id="applyEditBtn">应用修改</button><button id="cancelEditBtn">收起</button></div>';
+    top += '<div class="warn" style="margin-top:10px;">输出只取 <b>prompt_en</b>；显示端中英对照。' +
+           '<br/>规则：新增草稿只有点击“应用修改”才会写入列表；新增打开时再次点「新增」会直接丢弃草稿并收起。</div>';
+
+    box.innerHTML = '<div class="panel" style="margin:10px 0 18px 0;"><div class="panel-b" style="padding-top:10px;">' + top + '</div></div>';
+
+    var applyBtn = $("applyEditBtn");
+    var cancelBtn = $("cancelEditBtn");
+
+    if (applyBtn){
+      applyBtn.addEventListener("click", function(){
+        var zh = $("edit_label_zh").value.replace(/^\s+|\s+$/g, "");
+        var en = $("edit_label_en").value.replace(/^\s+|\s+$/g, "");
+        var pe = $("edit_prompt_en").value.replace(/^\s+|\s+$/g, "");
+        var nz = $("edit_notes_zh").value;
+        if (!zh || !en || !pe){ alert("中文名、英文名、英文正文不能为空。"); return; }
+
+        if (editing.mode === "edit"){
+          // 覆盖原项
+          var o = getOption(editing.categoryKey, editing.optionId);
+          if (!o) { alert("未找到要编辑的原始项。"); return; }
+          o.label_zh = zh;
+          o.label_en = en;
+          o.prompt_en = pe;
+          o.notes_zh = nz;
+
+        } else if (editing.mode === "add"){
+          // 新增：此时才真正写入列表，并分配唯一 id
+          var c2 = getCategory(editing.categoryKey);
+          if (!c2) return;
+
+          var baseId = editing.categoryKey + "_new";
+          var n = 1, id = baseId;
+          var ids = {};
+          for (var i=0;i<c2.options.length;i++) ids[c2.options[i].id] = true;
+          while (ids[id]) { n++; id = baseId + "_" + n; }
+
+          var opt = {
+            id: id,
+            label_zh: zh,
+            label_en: en,
+            prompt_en: pe,
+            notes_zh: nz
+          };
+          c2.options.push(opt);
+          state.selected[editing.categoryKey] = id;
+        }
+
+        // 关闭编辑框并刷新 UI
+        closeAllInlineEditors();
+        editing = {categoryKey:null, optionId:null, mode:null, draft:null};
+        updateModuleButtonActiveState();
+
+        renderSelectors();
+        renderOutput();
+        setSaveStatus("未保存", "");
+      });
+    }
+
+    if (cancelBtn){
+      cancelBtn.addEventListener("click", function(){
+        closeAllInlineEditors();
+        editing = {categoryKey:null, optionId:null, mode:null, draft:null};
+        updateModuleButtonActiveState();
+      });
+    }
+  }
+
+  function renderFreeFields(){
+    var body = $("free_fields_body");
+    if (!body){ return; }
+
+    var val = (state.free && state.free.free_desc) ? state.free.free_desc : "";
+    body.innerHTML =
+      '<div class="ff-one">' +
+        '' +
+        '<textarea class="free-desc" id="free_desc_ta" placeholder="Write extra description in English (included in output)...">' +
+          escHtml(val) +
+        '</textarea>' +
+        '<div class="hint">进入输出：仅英文内容（此处即会进入输出）。</div>' +
+      '</div>';
+
+    var ta = $("free_desc_ta");
+    if (ta){
+      ta.addEventListener("input", function(){
+        if (!state.free) state.free = {};
+        state.free.free_desc = this.value || "";
+        setSaveStatus("未保存","");
+        renderOutput();
+      });
+    }
+  }
+
+
+  function applyFreePanelsCollapse(){
+    var body = $("free_fields_body"); if (!body) return;
+    var ui = loadUIState(); ui.editorPanelsCollapsed = ui.editorPanelsCollapsed || {};
+    var panels = body.querySelectorAll('.panel[data-panel]');
+    for (var i=0;i<panels.length;i++){
+      var p = panels[i];
+      var key = p.getAttribute('data-panel');
+      var isC = !!ui.editorPanelsCollapsed[key];
+      if (isC) p.classList.add('collapsed'); else p.classList.remove('collapsed');
+      var chev = p.querySelector('[data-panel-chev="'+key+'"]');
+      if (chev) chev.textContent = isC ? '▸' : '▾';
+    }
+  }
+
+  function applyFreeFieldsCollapse(){
+    var ui = loadUIState(); ui = ui || {};
+    var panel = $("free_fields_panel");
+    if (!panel) return;
+    var head = $("free_fields_chev");
+    var isC = !!ui.freeFieldsCollapsed;
+    if (isC) panel.classList.add('collapsed'); else panel.classList.remove('collapsed');
+    if (head) head.textContent = isC ? '▸' : '▾';
+  }
+
+function renderOutput(){
+    outputEl.textContent = composeOutput();
+    $("dedupState").textContent = state.dedup ? "ON" : "OFF";
+    $("cleanState").textContent = state.clean ? "ON" : "OFF";
+  }
+
+  function loadProjects(){
+    var saved = localStorage.getItem(LS_PROJECTS);
+    var obj={};
+    if (saved) { try{ obj=JSON.parse(saved)||{}; }catch(e){ obj={}; } }
+    var merged={};
+    // 临时导入项目放在列表最前
+    if (typeof importedProject !== "undefined" && importedProject) merged["__imported__"] = importedProject;
+    for (var k in BUILTIN_PROJECTS) merged[k]=BUILTIN_PROJECTS[k];
+    for (var k2 in obj) merged[k2]=obj[k2];
+    return merged;
+  }
+  function saveProjects(all){
+    var toSave={};
+    for (var k in all){
+      if (BUILTIN_PROJECTS[k]) continue;
+      toSave[k]=all[k];
+    }
+    localStorage.setItem(LS_PROJECTS, JSON.stringify(toSave));
+  }
+
+  function renderProjects(){
+    var projects=loadProjects();
+    var items=[];
+    for (var id in projects){
+      var p=projects[id];
+      var name = (p.meta && p.meta.name) ? p.meta.name : id;
+      var ver  = (p.meta && p.meta.version) ? p.meta.version : "";
+      var desc = (p.meta && p.meta.description_zh) ? p.meta.description_zh : "";
+      var badge = "";
+      if (id === "__imported__") badge = " · 已导入(未保存)";
+      else if (BUILTIN_PROJECTS[id]) badge = " · 内置";
+      var extra = "";
+      if (id === "__imported__" && importedProjectInfo && importedProjectInfo.fileName) extra = "来源: " + importedProjectInfo.fileName;
+      items.push(
+        '<div class="proj-item ' + (id===activeProjectId?'active':'') + '" data-proj="' + escAttr(id) + '">' +
+          '<div class="proj-name">' + escHtml(name) + '</div>' +
+          '<div class="proj-meta">' + escHtml(ver) + badge + (desc ? (' · ' + escHtml(desc)) : '') + '</div>' +
+          (extra ? ('<div class="proj-meta">' + escHtml(extra) + '</div>') : '') +
+        '</div>'
+      );
+    }
+    projectsEl.innerHTML = items.join("") || '<div class="warn">没有项目。你可以“保存为项目”。</div>';
+
+    var nodes = projectsEl.querySelectorAll(".proj-item");
+    for (var i=0;i<nodes.length;i++){
+      nodes[i].addEventListener("click", function(){
+        var id=this.getAttribute("data-proj");
+        loadProjectById(id);
+      });
+      nodes[i].addEventListener("contextmenu", function(e){
+        e.preventDefault();
+        var id=this.getAttribute("data-proj");
+        activeProjectId=id;
+        renderProjects();
+        showProjCtx(e.clientX, e.clientY, id);
+      });
+    }
+  }
+
+  
+  function loadProjectById(id){
+    var projects=loadProjects();
+    var p=projects[id];
+    if (!p) return;
+    var err=validatePack(p);
+    if (err) { alert("项目内容包无效：" + err); return; }
+    activeProjectId=id;
+    initFromPack(deepClone(p));
+    renderProjects();
+    setProjStatus("已载入项目","ok");
+  }
+
+  // ---- Project context menu ----
+  var projCtx = null;
+  var projCtxId = null;
+
+  function hideProjCtx(){
+    if (!projCtx) projCtx = $("projCtx");
+    projCtx.classList.add("hidden");
+    projCtx.setAttribute("aria-hidden","true");
+    projCtxId = null;
+  }
+
+  function showProjCtx(x,y,id){
+    if (!projCtx) projCtx = $("projCtx");
+    projCtxId = id;
+    // enable/disable actions for builtin projects
+    var isBuiltin = !!BUILTIN_PROJECTS[id];
+    var btnRename = projCtx.querySelector('[data-act="rename"]');
+    var btnDelete = projCtx.querySelector('[data-act="delete"]');
+    if (btnRename) btnRename.disabled = isBuiltin;
+    if (btnDelete) btnDelete.disabled = isBuiltin;
+
+    var vw = window.innerWidth, vh = window.innerHeight;
+    projCtx.classList.remove("hidden");
+    projCtx.setAttribute("aria-hidden","false");
+    // place within viewport
+    var rect = projCtx.getBoundingClientRect();
+    var px = Math.min(x, vw - rect.width - 10);
+    var py = Math.min(y, vh - rect.height - 10);
+    projCtx.style.left = px + "px";
+    projCtx.style.top  = py + "px";
+  }
+
+  document.addEventListener("click", function(e){
+    if (!projCtx) projCtx = $("projCtx");
+    if (projCtx.classList.contains("hidden")) return;
+    if (e.target.closest && e.target.closest("#projCtx")) return;
+    hideProjCtx();
+  });
+  document.addEventListener("keydown", function(e){
+    if (e.key === "Escape") hideProjCtx();
+  });
+
+  document.addEventListener("click", function(e){
+    var t = e.target;
+    if (!(t && t.getAttribute)) return;
+    var act = t.getAttribute("data-act");
+    if (!act) return;
+    if (!projCtxId) return;
+    if (act === "load"){ hideProjCtx(); loadProjectById(projCtxId); return; }
+    if (act === "rename"){ hideProjCtx(); $("renameProjectBtn").click(); return; }
+    if (act === "delete"){ hideProjCtx(); $("deleteProjectBtn").click(); return; }
+  });
+
+function promptIdFromName(name){
+    var base = (name||"project").toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");
+    return base || "project";
+  }
+
+  $("saveProjectBtn").addEventListener("click", function(){
+    if (!pack) { alert("当前没有内容包。"); return; }
+    var name = prompt("项目名（显示用）", (pack.meta && pack.meta.name) ? pack.meta.name : "BanruoUI Project");
+    if (name===null) return;
+    var idBase = promptIdFromName(name);
+    var projects=loadProjects();
+    var id=idBase, n=1;
+    while (projects[id]) { n++; id=idBase+"_"+n; }
+    pack.meta = pack.meta || {};
+    pack.meta.name = name;
+    projects[id]=deepClone(pack);
+    saveProjects(projects);
+    activeProjectId=id;
+    renderProjects();
+    setProjStatus("已保存为项目（本地）","ok");
+  });
+
+  $("renameProjectBtn").addEventListener("click", function(){
+    if (!activeProjectId) { alert("先点左侧选中一个项目。"); return; }
+    if (BUILTIN_PROJECTS[activeProjectId]) { alert("内置项目不可重命名（可先保存为项目再改）。"); return; }
+    var projects=loadProjects();
+    var p=projects[activeProjectId];
+    if (!p) return;
+    var newName = prompt("新项目名", (p.meta && p.meta.name) ? p.meta.name : activeProjectId);
+    if (newName===null) return;
+    p.meta = p.meta || {};
+    p.meta.name = newName;
+    projects[activeProjectId]=p;
+    saveProjects(projects);
+    renderProjects();
+    setProjStatus("已重命名","ok");
+  });
+
+  $("deleteProjectBtn").addEventListener("click", function(){
+    if (!activeProjectId) { alert("先点左侧选中一个项目。"); return; }
+    if (BUILTIN_PROJECTS[activeProjectId]) { alert("内置项目不可删除。"); return; }
+    var projects=loadProjects();
+    if (!projects[activeProjectId]) return;
+    if (!confirm("确定删除该项目？（只删除本地保存）")) return;
+    delete projects[activeProjectId];
+    saveProjects(projects);
+    activeProjectId=null;
+    renderProjects();
+    setProjStatus("已删除","ok");
+  });
+
+  fileInput.addEventListener("change", function(){
+    var file = (fileInput.files && fileInput.files[0]) ? fileInput.files[0] : null;
+    if (!file) { setProjStatus("未选择文件","bad"); return; }
+    setProjStatus("正在读取：" + file.name, "");
+    var reader = new FileReader();
+    reader.onload = function(){
+      try{
+        var obj = JSON.parse(String(reader.result));
+        var err = validatePack(obj);
+        if (err) { setProjStatus("导入失败：" + err,"bad"); alert("导入失败：" + err); return; }
+        importedProject = deepClone(obj);
+        importedProject.meta = importedProject.meta || {};
+        if (!importedProject.meta.name) importedProject.meta.name = file.name.replace(/\.json$/i,"");
+        importedProjectInfo = { fileName: file.name, importedAt: new Date().toISOString() };
+        activeProjectId="__imported__";
+        initFromPack(importedProject);
+        renderProjects();
+        setProjStatus("已导入并选中：未保存（可保存为项目）","ok");
+      }catch(e){
+        setProjStatus("导入失败：JSON 解析错误","bad");
+        alert("导入失败：" + e);
+      } finally {
+        fileInput.value = "";
+      }
+    };
+    reader.readAsText(file, "utf-8");
+  });
+
+  function downloadText(filename, text){
+    var blob = new Blob([text], {type:"application/json;charset=utf-8"});
+    var url = URL.createObjectURL(blob);
+    var a=document.createElement("a");
+    a.href=url; a.download=filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  $("exportBtn").addEventListener("click", function(){
+    if (!pack) { alert("没有内容包可导出。"); return; }
+    var name = (pack.meta && pack.meta.name) ? pack.meta.name : "banruoui_pack";
+    var fname = name.replace(/[^a-zA-Z0-9_\-]+/g,"_") + ".json";
+    downloadText(fname, JSON.stringify(pack, null, 2));
+    setSaveStatus("已导出 JSON","ok");
+  });
+
+  $("downloadTemplateBtn").addEventListener("click", function(){
+    // 示例模板（用户提供）
+        downloadText("BanruoUI_prompt提示词示范模版.json", JSON.stringify(DEMO_TEMPLATE, null, 2));
+    setProjStatus("已下载示范模板","ok");
+  });
+
+  $("saveLocalBtn").addEventListener("click", function(){
+    if (!pack) { alert("没有内容包。"); return; }
+    localStorage.setItem(LS_STATE, JSON.stringify({ pack: pack, state: state, activeProjectId: activeProjectId }));
+    setSaveStatus("已保存本地状态","ok");
+  });
+
+  $("loadLocalBtn").addEventListener("click", function(){
+    var s = localStorage.getItem(LS_STATE);
+    if (!s) { alert("本地没有保存状态。"); return; }
+    try{
+      var payload=JSON.parse(s);
+      var err=validatePack(payload.pack);
+      if (err) { alert("本地状态内容包无效：" + err); return; }
+      activeProjectId = payload.activeProjectId || null;
+      pack = payload.pack;
+      state = payload.state || state;
+      for (var i=0;i<pack.categories.length;i++){
+        var c=pack.categories[i];
+        if (!state.selected) state.selected={};
+        if (!state.selected[c.key]) state.selected[c.key] = (c.default_selected_ids && c.default_selected_ids[0]) ? c.default_selected_ids[0] : c.options[0].id;
+      }
+      var fields=(pack.editor && Array.isArray(pack.editor.fields))?pack.editor.fields:[];
+      if (!state.editor) state.editor={};
+      for (var j=0;j<fields.length;j++){
+        var f=fields[j];
+        if (state.editor[f.key]===undefined) state.editor[f.key]=f["default"]||"";
+      }
+      editing={categoryKey:null, optionId:null, mode:null};
+      renderProjects(); renderSelectors(); if (editing.categoryKey) { renderInlineEditor(editing.categoryKey); } renderOutput();
+      setSaveStatus("已载入本地状态","ok");
+      setProjStatus("已载入本地状态","ok");
+    }catch(e){ alert("载入失败：" + e); }
+  });
+
+  $("clearLocalBtn").addEventListener("click", function(){
+    localStorage.removeItem(LS_STATE);
+    localStorage.removeItem(LS_PROJECTS);
+    activeProjectId=null;
+    renderProjects();
+    setSaveStatus("已清空本地","ok");
+    setProjStatus("已清空本地","ok");
+  });
+
+  $("toggleDedupBtn").addEventListener("click", function(){ state.dedup=!state.dedup; renderOutput(); setSaveStatus("未保存",""); });
+  $("toggleCleanBtn").addEventListener("click", function(){ state.clean=!state.clean; renderOutput(); setSaveStatus("未保存",""); });
+
+  $("copyBtn").addEventListener("click", function(){
+    var text=outputEl.textContent||"";
+    if (!text) return;
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ setSaveStatus("已复制","ok"); }, function(){ setSaveStatus("复制失败","bad"); });
+    } else {
+      var ta=document.createElement("textarea");
+      ta.value=text; document.body.appendChild(ta); ta.select();
+      document.execCommand("copy"); ta.remove();
+      setSaveStatus("已复制","ok");
+    }
+  });
+
+
+  // 列折叠：点击标题栏折叠/展开（最高兼容级别 L1）
+  (function(){
+    var cards = document.querySelectorAll('.card[data-col] > h2');
+    for (var i=0;i<cards.length;i++){
+      cards[i].addEventListener('click', function(ev){
+        // 如果点到按钮/输入等交互元素则忽略（当前标题栏无按钮，预留）
+        var t = ev.target;
+        if (t && (t.tagName === 'BUTTON' || t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
+        var card = this.parentElement;
+        var key = card.getAttribute('data-col');
+        if (!key) return;
+        toggleColumnCollapse(key);
+      });
+    }
+    applyColumnCollapse();
+    applyEditorXCollapse();
+  })();
+
+  try{
+    activeProjectId="project_minimal";
+    initFromPack(deepClone(BUILTIN_PROJECTS.project_minimal));
+    setProjStatus("已载入内置项目：最小模板","ok");
+  }catch(e){
+    log("BOOT FAILED: " + (e && (e.stack||e.message||e)));
+    alert("BOOT FAILED: " + (e && (e.message||e)));
+  }
+})();
+
+
+(function(){
+  const btn = document.getElementById("btnDownloadTpl") || document.getElementById("btnDownloadTemplate") || document.getElementById("btnDownloadDemoTpl");
+  if (!btn) return;
+
+  const DEMO_FILE_NAME = "BanruoUI_prompt提示词示范模版.json";
+
+  async function downloadExternalDemoTemplate(){
+    try{
+      // Expect the JSON file to be alongside this HTML. No more "embedded template".
+      const res = await fetch(DEMO_FILE_NAME, { cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const text = await res.text();
+
+      const blob = new Blob([text], { type: "application/json;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = DEMO_FILE_NAME;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+    }catch(e){
+      alert("未找到示范模板文件：\\n" +
+            "请把同目录的 JSON 文件放在此 HTML 旁边：\\n" +
+            "  " + DEMO_FILE_NAME + "\\n\\n" +
+            "然后刷新页面再点“下载示范模板”。");
+    }
+  }
+
+  // Remove old listeners by re-binding via onclick
+  btn.onclick = downloadExternalDemoTemplate;
+})();
+
+</script>
+
+<!-- Project context menu -->
+<div id="projCtx" class="ctx hidden" role="menu" aria-hidden="true">
+  <button class="ctx-item" data-act="load">载入</button>
+  <button class="ctx-item" data-act="rename">重命名</button>
+  <button class="ctx-item danger" data-act="delete">删除</button>
+</div>
+
+</body>
+</html>
