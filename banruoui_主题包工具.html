@@ -334,7 +334,7 @@
     <button id="renameProjectBtn" style="display:none"></button>
     <button id="deleteProjectBtn" style="display:none"></button>
 
-      <h2><span>项目管理</span><span class="hint">右键：载入 / 重命名 / 删除</span><span class="chev" data-chev>▾</span></h2>
+      <h2><span>项目管理</span><span class="hint">点击：载入 / 右键：更多操作</span><span class="chev" data-chev>▾</span></h2>
       <div class="content" id="projects"></div>
       <div class="toolbar">
         <span class="status" id="projStatus">就绪</span>
@@ -418,8 +418,8 @@
 var LS_PROJECTS = "banruoui_prompt_projects_v1";
   var LS_STATE = "banruoui_prompt_state_v1";
   var LS_UI = "banruoui_prompt_ui_v1";
-  var importedProject = null; // 临时导入项目（未保存）
-  var importedProjectInfo = null; // {fileName, importedAt}
+  var importedProjects = {}; // 存储多个导入项目：{id: {project, info}}
+  var nextImportId = 1; // 导入项目ID计数器
 
   var projectsEl = $("projects");
   var selectorsEl = $("selectors");
@@ -586,6 +586,98 @@ var LS_PROJECTS = "banruoui_prompt_projects_v1";
     }catch(e){}
   }
 
+  // 新增：添加新分类的函数
+  function addNewCategory() {
+    if (!pack) {
+      alert("请先加载一个项目");
+      return;
+    }
+
+    // 创建新的分类对象
+    var newCategoryIndex = pack.categories.length + 1;
+    var newCategoryKey = "new_category_" + Date.now();
+    var defaultOptionId = newCategoryKey + "_option_1";
+    
+    var newCategory = {
+      key: newCategoryKey,
+      title_zh: "新分类" + newCategoryIndex,
+      title_en: "New Category" + newCategoryIndex,
+      default_selected_ids: [defaultOptionId],
+      options: [
+        {
+          id: defaultOptionId,
+          label_zh: "新选项",
+          label_en: "New Option",
+          prompt_en: "Write your module prompt in English here.",
+          notes_zh: ""
+        }
+      ]
+    };
+
+    // 添加到pack.categories数组
+    pack.categories.push(newCategory);
+    
+    // 更新状态
+    state.selected[newCategoryKey] = defaultOptionId;
+    
+    // 关闭所有内联编辑器
+    closeAllInlineEditors();
+    editing = {categoryKey: null, optionId: null, mode: null, draft: null};
+    
+    // 重新渲染选择区
+    renderSelectors();
+    
+    // 重新渲染输出
+    renderOutput();
+    
+    // 标记未保存状态
+    setSaveStatus("未保存", "");
+    
+    // 记录日志
+    log("已添加新分类: " + newCategory.title_zh);
+  }
+
+  // 新增：删除分类的函数
+  function deleteCategory(catKey) {
+    if (!pack || !catKey) return;
+    
+    // 查找分类索引
+    var catIndex = -1;
+    for (var i = 0; i < pack.categories.length; i++) {
+      if (pack.categories[i].key === catKey) {
+        catIndex = i;
+        break;
+      }
+    }
+    
+    if (catIndex === -1) return;
+    
+    // 确认删除
+    var catName = pack.categories[catIndex].title_zh || catKey;
+    if (!confirm("确定删除分类 \"" + catName + "\" 及其所有选项吗？")) {
+      return;
+    }
+    
+    // 从数组中删除
+    pack.categories.splice(catIndex, 1);
+    
+    // 从状态中删除
+    delete state.selected[catKey];
+    
+    // 如果正在编辑该分类，关闭编辑器
+    if (editing.categoryKey === catKey) {
+      closeAllInlineEditors();
+      editing = {categoryKey: null, optionId: null, mode: null, draft: null};
+    }
+    
+    // 重新渲染
+    renderSelectors();
+    renderOutput();
+    setSaveStatus("未保存", "");
+    
+    log("已删除分类: " + catName);
+  }
+
 function renderSelectors(){
     if (!pack) { selectorsEl.innerHTML = '<div class="warn">请先载入一个项目或导入 JSON。</div>'; return; }
     var htmlParts=[];
@@ -616,12 +708,22 @@ function renderSelectors(){
           '<div class="kv">' +
             '<button type="button" data-edit="' + escAttr(c.key) + '">编辑</button>' +
             '<button type="button" data-add="' + escAttr(c.key) + '">新增</button>' +
-            '<button type="button" data-del="' + escAttr(c.key) + '" style="border-color: rgba(255,106,106,.35);">删除</button>' +
+            '<button type="button" data-delcat="' + escAttr(c.key) + '" style="border-color: rgba(255,106,106,.35);">删除分类</button>' +
           '</div>' +
         '</div>' +
         '<div class="inline-editor" id="inline_editor_' + escAttr(c.key) + '" style="display:none;"></div>'
       );
     }
+
+    // 添加新建分类模块（现在有功能了）
+    htmlParts.push(
+      '<div class="field" id="add-category-module">' +
+        '<div id="add-category-btn" style="border: 2px dashed rgba(106,163,255,.5); border-radius:12px; padding:24px 12px; text-align:center; background:rgba(106,163,255,.05); cursor:pointer;">' +
+          '<div style="font-size:28px; color:var(--accent); margin-bottom:8px;">+</div>' +
+          '<div style="font-size:12px; color:var(--muted);">点击创建新分类模块</div>' +
+        '</div>' +
+      '</div>'
+    );
 
     selectorsEl.innerHTML = htmlParts.join("");
 
@@ -658,9 +760,12 @@ function renderSelectors(){
     for (var b=0;b<adds.length;b++){
       adds[b].addEventListener("click", function(){ startAddOption(this.getAttribute("data-add")); });
     }
-    var dels = selectorsEl.querySelectorAll("button[data-del]");
-    for (var c2=0;c2<dels.length;c2++){
-      dels[c2].addEventListener("click", function(){ deleteSelectedOption(this.getAttribute("data-del")); });
+    // 分类删除按钮
+    var delCatBtns = selectorsEl.querySelectorAll("button[data-delcat]");
+    for (var c2=0;c2<delCatBtns.length;c2++){
+      delCatBtns[c2].addEventListener("click", function(){ 
+        deleteCategory(this.getAttribute("data-delcat")); 
+      });
     }
 
     // free fields accordion
@@ -672,6 +777,12 @@ function renderSelectors(){
         saveUIState(ui);
         applyFreeFieldsCollapse();
       });
+    }
+
+    // 为加号按钮绑定点击事件
+    var addCategoryBtn = document.getElementById("add-category-btn");
+    if (addCategoryBtn) {
+      addCategoryBtn.addEventListener("click", addNewCategory);
     }
 
     renderFreeFields();
@@ -876,7 +987,7 @@ function renderSelectors(){
            '<textarea id="edit_notes_zh">' + escHtml(d.notes_zh||"") + '</textarea></div>';
     top += '<div class="row"><button id="applyEditBtn">应用修改</button><button id="cancelEditBtn">收起</button></div>';
     top += '<div class="warn" style="margin-top:10px;">输出只取 <b>prompt_en</b>；显示端中英对照。' +
-           '<br/>规则：新增草稿只有点击“应用修改”才会写入列表；新增打开时再次点「新增」会直接丢弃草稿并收起。</div>';
+           '<br/>规则：新增草稿只有点击"应用修改"才会写入列表；新增打开时再次点「新增」会直接丢弃草稿并收起。</div>';
 
     box.innerHTML = '<div class="panel" style="margin:10px 0 18px 0;"><div class="panel-b" style="padding-top:10px;">' + top + '</div></div>';
 
@@ -997,18 +1108,31 @@ function renderOutput(){
 
   function loadProjects(){
     var saved = localStorage.getItem(LS_PROJECTS);
-    var obj={};
-    if (saved) { try{ obj=JSON.parse(saved)||{}; }catch(e){ obj={}; } }
-    var merged={};
-    if (typeof importedProject !== "undefined" && importedProject) merged["__imported__"] = importedProject;
-    for (var k in BUILTIN_PROJECTS) merged[k]=BUILTIN_PROJECTS[k];
-    for (var k2 in obj) merged[k2]=obj[k2];
+    var obj = {};
+    if (saved) { 
+      try{ obj = JSON.parse(saved) || {}; } catch(e){ obj = {}; } 
+    }
+    
+    var merged = {};
+    
+    // 1. 先合并内置项目
+    for (var k in BUILTIN_PROJECTS) merged[k] = BUILTIN_PROJECTS[k];
+    
+    // 2. 再合并本地保存的项目
+    for (var k2 in obj) merged[k2] = obj[k2];
+    
+    // 3. 最后合并所有导入的项目（不覆盖，顺序排列）
+    for (var impId in importedProjects) {
+      merged[impId] = importedProjects[impId].project;
+    }
+    
     return merged;
   }
   function saveProjects(all){
     var toSave={};
     for (var k in all){
       if (BUILTIN_PROJECTS[k]) continue;
+      if (importedProjects[k]) continue; // 导入项目不保存到localStorage
       toSave[k]=all[k];
     }
     localStorage.setItem(LS_PROJECTS, JSON.stringify(toSave));
@@ -1022,9 +1146,22 @@ function renderOutput(){
       var name = (p.meta && p.meta.name) ? p.meta.name : id;
       var ver  = (p.meta && p.meta.version) ? p.meta.version : "";
       var desc = (p.meta && p.meta.description_zh) ? p.meta.description_zh : "";
+      
       var badge = "";
-      if (id === "__imported__") badge = " · 已导入(未保存)";
-      else if (BUILTIN_PROJECTS[id]) badge = " · 内置";
+      var extra = "";
+      
+      // 判断项目类型并设置标识
+      if (BUILTIN_PROJECTS[id]) {
+        badge = " · 内置";
+      } else if (importedProjects[id]) {
+        badge = " · 已导入";
+        extra = importedProjects[id].info.fileName 
+          ? "来源: " + importedProjects[id].info.fileName 
+          : "";
+      } else {
+        badge = " · 本地项目";
+      }
+      
       var extra = "";
       if (id === "__imported__" && importedProjectInfo && importedProjectInfo.fileName) extra = "来源: " + importedProjectInfo.fileName;
       items.push(
@@ -1035,7 +1172,7 @@ function renderOutput(){
         '</div>'
       );
     }
-    projectsEl.innerHTML = items.join("") || '<div class="warn">没有项目。你可以“保存为项目”。</div>';
+    projectsEl.innerHTML = items.join("") || '<div class="warn">没有项目。你可以"导入JSON"或"保存为项目"。</div>';
 
     var nodes = projectsEl.querySelectorAll(".proj-item");
     for (var i=0;i<nodes.length;i++){
@@ -1133,7 +1270,21 @@ function promptIdFromName(name){
     pack.meta = pack.meta || {};
     pack.meta.name = name;
     projects[id]=deepClone(pack);
-    saveProjects(projects);
+    
+    // 保存到本地存储
+    var saved = localStorage.getItem(LS_PROJECTS);
+    var obj = {};
+    if (saved) { 
+      try{ obj = JSON.parse(saved) || {}; } catch(e){ obj = {}; } 
+    }
+    obj[id] = deepClone(pack);
+    localStorage.setItem(LS_PROJECTS, JSON.stringify(obj));
+    
+    // 如果当前是导入的项目，保存后从importedProjects中移除
+    if (importedProjects[activeProjectId]) {
+      delete importedProjects[activeProjectId];
+    }
+    
     activeProjectId=id;
     renderProjects();
     setProjStatus("已保存为项目（本地）","ok");
@@ -1160,9 +1311,22 @@ function promptIdFromName(name){
     if (BUILTIN_PROJECTS[activeProjectId]) { alert("内置项目不可删除。"); return; }
     var projects=loadProjects();
     if (!projects[activeProjectId]) return;
-    if (!confirm("确定删除该项目？（只删除本地保存）")) return;
-    delete projects[activeProjectId];
-    saveProjects(projects);
+    if (!confirm("确定删除该项目？")) return;
+    
+    // 如果是导入的项目，从importedProjects中删除
+    if (importedProjects[activeProjectId]) {
+      delete importedProjects[activeProjectId];
+    } else {
+      // 如果是本地保存的项目，从localStorage中删除
+      var saved = localStorage.getItem(LS_PROJECTS);
+      var obj = {};
+      if (saved) { 
+        try{ obj = JSON.parse(saved) || {}; } catch(e){ obj = {}; } 
+      }
+      delete obj[activeProjectId];
+      localStorage.setItem(LS_PROJECTS, JSON.stringify(obj));
+    }
+    
     activeProjectId=null;
     renderProjects();
     setProjStatus("已删除","ok");
@@ -1178,14 +1342,32 @@ function promptIdFromName(name){
         var obj = JSON.parse(String(reader.result));
         var err = validatePack(obj);
         if (err) { setProjStatus("导入失败：" + err,"bad"); alert("导入失败：" + err); return; }
-        importedProject = deepClone(obj);
-        importedProject.meta = importedProject.meta || {};
-        if (!importedProject.meta.name) importedProject.meta.name = file.name.replace(/\.json$/i,"");
-        importedProjectInfo = { fileName: file.name, importedAt: new Date().toISOString() };
-        activeProjectId="__imported__";
-        initFromPack(importedProject);
+        
+        // 生成唯一ID（基于时间戳和计数器）
+        var importId = "import_" + Date.now() + "_" + (nextImportId++);
+        
+        // 深拷贝项目数据
+        var projectCopy = deepClone(obj);
+        projectCopy.meta = projectCopy.meta || {};
+        if (!projectCopy.meta.name) {
+          projectCopy.meta.name = file.name.replace(/\.json$/i, "") + " (导入)";
+        }
+        
+        // 存储到importedProjects对象
+        importedProjects[importId] = {
+          project: projectCopy,
+          info: {
+            fileName: file.name,
+            importedAt: new Date().toISOString(),
+            isImported: true
+          }
+        };
+        
+        // 设置为当前活动项目
+        activeProjectId = importId;
+        initFromPack(projectCopy);
         renderProjects();
-        setProjStatus("已导入并选中：未保存（可保存为项目）","ok");
+        setProjStatus("已导入（" + file.name + "），未保存","ok");
       }catch(e){
         setProjStatus("导入失败：JSON 解析错误","bad");
         alert("导入失败：" + e);
@@ -1255,10 +1437,15 @@ function promptIdFromName(name){
   $("clearLocalBtn").addEventListener("click", function(){
     localStorage.removeItem(LS_STATE);
     localStorage.removeItem(LS_PROJECTS);
+    
+    // 同时清空所有导入的项目
+    importedProjects = {};
+    nextImportId = 1;
+    
     activeProjectId=null;
     renderProjects();
     setSaveStatus("已清空本地","ok");
-    setProjStatus("已清空本地","ok");
+    setProjStatus("已清空本地（包括导入项目）","ok");
   });
 
   $("toggleDedupBtn").addEventListener("click", function(){ state.dedup=!state.dedup; renderOutput(); setSaveStatus("未保存",""); });
@@ -1296,9 +1483,14 @@ function promptIdFromName(name){
   })();
 
   try{
-    activeProjectId="project_minimal";
-    initFromPack(deepClone(BUILTIN_PROJECTS.project_minimal));
-    setProjStatus("已载入内置项目：最小模板","ok");
+    // 初始加载时，不自动加载任何项目，等待用户选择
+    // 不再自动加载内置项目
+    // activeProjectId = "project_minimal";
+    // initFromPack(deepClone(BUILTIN_PROJECTS.project_minimal));
+    // setProjStatus("已载入内置项目：最小模板","ok");
+    
+    // 只显示空状态
+    setProjStatus("就绪，请导入或选择项目","");
   }catch(e){
     log("BOOT FAILED: " + (e && (e.stack||e.message||e)));
     alert("BOOT FAILED: " + (e && (e.message||e)));
