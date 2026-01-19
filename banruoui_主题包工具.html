@@ -623,17 +623,6 @@ function renderSelectors(){
       );
     }
 
-    // 自由字段（全局编辑，属于选择区的子区域）
-    htmlParts.push(
-      '<div class="panel" id="free_fields_panel">' +
-        '<div class="panel-h" id="free_fields_head">' +
-          '<div class="t"></div>' +
-          '<div class="chev" id="free_fields_chev">▾</div>' +
-        '</div>' +
-        '<div class="panel-b" id="free_fields_body"></div>' +
-      '</div>'
-    );
-
     selectorsEl.innerHTML = htmlParts.join("");
 
     // bind selects
@@ -643,9 +632,6 @@ function renderSelectors(){
         var cat=this.getAttribute("data-cat");
         state.selected[cat]=this.value;
 
-        // 如果正在编辑该模块：
-        // - edit 模式：随选择变化重新载入草稿（副本）
-        // - add 模式：保持当前草稿不变（避免误覆盖）
         if (editing && editing.categoryKey === cat){
           if (editing.mode === "edit"){
             editing.optionId = this.value;
@@ -698,12 +684,8 @@ function renderSelectors(){
       if (box){ box.style.display = ""; renderInlineEditor(editing.categoryKey); }
     }
   }  function startAddOption(catKey){
-    // 新增按钮规则（确认版）：
-    // 第一次点「新增」：展开编辑框 + 创建草稿（仅存在编辑框，不进入列表）
-    // 新增编辑框打开期间，再点一次「新增」：收起编辑框并丢弃草稿（不弹确认，不保存）
     if (!pack) return;
 
-    // 再点一次=收起并丢弃草稿
     if (editing.categoryKey === catKey && editing.mode === "add"){
       closeAllInlineEditors();
       editing = {categoryKey:null, optionId:null, mode:null, draft:null};
@@ -711,7 +693,6 @@ function renderSelectors(){
       return;
     }
 
-    // 第一次点=打开新增编辑框，创建草稿（不写入 c.options）
     var c = getCategory(catKey);
     if (!c) return;
 
@@ -722,7 +703,7 @@ function renderSelectors(){
       optionId: null,
       mode: "add",
       draft: {
-        id: "", // 新增草稿不分配真实 id，直到“应用修改”
+        id: "", 
         label_zh: "新选项",
         label_en: "New option",
         prompt_en: "Write your module prompt in English here.",
@@ -804,15 +785,15 @@ function renderSelectors(){
       var o=getOption(c.key, state.selected[c.key]);
       if (o && o.prompt_en) parts.push(o.prompt_en);
     }
-    var freeFields = [
-      { key: "free_desc",  label_zh: "自由描述", label_en: "Free description", placeholder_en: "Write extra description in English (included in output)..." }
-    ];
-    for (var j=0;j<freeFields.length;j++){
-      var f=freeFields[j];
-      var v=(state.editor[f.key]||"").replace(/^\s+|\s+$/g,"");
-      if (!v) continue;
-      parts.push(v);
+    
+    // 修复：自由描述正确从 state.free 读取（原版错读了 state.editor）
+    if (state.free && state.free.free_desc) {
+      var v = (state.free.free_desc || "").replace(/^\s+|\s+$/g, "");
+      if (v) {
+        parts.push(v);
+      }
     }
+    
     if (pack.globals && pack.globals.footer_en) parts.push(pack.globals.footer_en);
     if (pack.globals && pack.globals.negative_en && pack.globals.negative_en.replace(/^\s+|\s+$/g,"")) {
       parts.push("Negative prompt: " + pack.globals.negative_en.replace(/^\s+|\s+$/g,""));
@@ -828,12 +809,10 @@ function renderSelectors(){
     var boxes = selectorsEl.querySelectorAll('.inline-editor[id^="inline_editor_"]');
     for (var i=0;i<boxes.length;i++){ boxes[i].style.display="none"; boxes[i].innerHTML=""; }
   }  function toggleInlineEditor(catKey){
-    // 编辑按钮规则：点一次展开，点一次收起；不产生其他副作用
     if (!pack) return;
     var box = $("inline_editor_" + catKey);
     if (!box) return;
 
-    // 如果当前已以“编辑模式”打开同一模块：再次点击=收起并丢弃草稿
     if (editing.categoryKey === catKey && editing.mode === "edit"){
       closeAllInlineEditors();
       editing = {categoryKey:null, optionId:null, mode:null, draft:null};
@@ -841,7 +820,6 @@ function renderSelectors(){
       return;
     }
 
-    // 打开编辑框：载入当前选中项副本到草稿（不直接改原数据）
     var selectedId = state.selected[catKey];
     var o = getOption(catKey, selectedId);
     if (!o) return;
@@ -862,15 +840,11 @@ function renderSelectors(){
     if (!pack) return;
     var box = $("inline_editor_" + catKey);
     if (!box) return;
-    // Ensure mode class applies for both Edit and Add flows
     box.className = "inline-editor " + (editing.mode==="add" ? "adding" : "editing");
 
     var c=getCategory(catKey);
     if (!c){ box.innerHTML = '<div class="warn">未找到模块。</div>'; return; }
 
-    // 草稿来源：
-    // - edit：editing.draft 为选中项副本
-    // - add：editing.draft 为临时草稿（不入列表）
     var d = (editing && editing.categoryKey === catKey) ? editing.draft : null;
     if (!d){ box.innerHTML = '<div class="warn">未找到草稿。</div>'; return; }
 
@@ -910,7 +884,6 @@ function renderSelectors(){
         if (!zh || !en || !pe){ alert("中文名、英文名、英文正文不能为空。"); return; }
 
         if (editing.mode === "edit"){
-          // 覆盖原项
           var o = getOption(editing.categoryKey, editing.optionId);
           if (!o) { alert("未找到要编辑的原始项。"); return; }
           o.label_zh = zh;
@@ -919,7 +892,6 @@ function renderSelectors(){
           o.notes_zh = nz;
 
         } else if (editing.mode === "add"){
-          // 新增：此时才真正写入列表，并分配唯一 id
           var c2 = getCategory(editing.categoryKey);
           if (!c2) return;
 
@@ -940,7 +912,6 @@ function renderSelectors(){
           state.selected[editing.categoryKey] = id;
         }
 
-        // 关闭编辑框并刷新 UI
         closeAllInlineEditors();
         editing = {categoryKey:null, optionId:null, mode:null, draft:null};
         updateModuleButtonActiveState();
@@ -1021,7 +992,6 @@ function renderOutput(){
     var obj={};
     if (saved) { try{ obj=JSON.parse(saved)||{}; }catch(e){ obj={}; } }
     var merged={};
-    // 临时导入项目放在列表最前
     if (typeof importedProject !== "undefined" && importedProject) merged["__imported__"] = importedProject;
     for (var k in BUILTIN_PROJECTS) merged[k]=BUILTIN_PROJECTS[k];
     for (var k2 in obj) merged[k2]=obj[k2];
@@ -1102,7 +1072,6 @@ function renderOutput(){
   function showProjCtx(x,y,id){
     if (!projCtx) projCtx = $("projCtx");
     projCtxId = id;
-    // enable/disable actions for builtin projects
     var isBuiltin = !!BUILTIN_PROJECTS[id];
     var btnRename = projCtx.querySelector('[data-act="rename"]');
     var btnDelete = projCtx.querySelector('[data-act="delete"]');
@@ -1112,7 +1081,6 @@ function renderOutput(){
     var vw = window.innerWidth, vh = window.innerHeight;
     projCtx.classList.remove("hidden");
     projCtx.setAttribute("aria-hidden","false");
-    // place within viewport
     var rect = projCtx.getBoundingClientRect();
     var px = Math.min(x, vw - rect.width - 10);
     var py = Math.min(y, vh - rect.height - 10);
@@ -1238,7 +1206,6 @@ function promptIdFromName(name){
   });
 
   $("downloadTemplateBtn").addEventListener("click", function(){
-    // 示例模板（用户提供）
         downloadText("BanruoUI_prompt提示词示范模版.json", JSON.stringify(DEMO_TEMPLATE, null, 2));
     setProjStatus("已下载示范模板","ok");
   });
@@ -1308,7 +1275,6 @@ function promptIdFromName(name){
     var cards = document.querySelectorAll('.card[data-col] > h2');
     for (var i=0;i<cards.length;i++){
       cards[i].addEventListener('click', function(ev){
-        // 如果点到按钮/输入等交互元素则忽略（当前标题栏无按钮，预留）
         var t = ev.target;
         if (t && (t.tagName === 'BUTTON' || t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
         var card = this.parentElement;
@@ -1333,36 +1299,106 @@ function promptIdFromName(name){
 
 
 (function(){
-  const btn = document.getElementById("btnDownloadTpl") || document.getElementById("btnDownloadTemplate") || document.getElementById("btnDownloadDemoTpl");
+  const btn = document.getElementById("downloadTemplateBtn");  // 匹配你的按钮 id
   if (!btn) return;
 
   const DEMO_FILE_NAME = "BanruoUI_prompt提示词示范模版.json";
 
-  async function downloadExternalDemoTemplate(){
-    try{
-      // Expect the JSON file to be alongside this HTML. No more "embedded template".
-      const res = await fetch(DEMO_FILE_NAME, { cache: "no-store" });
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const text = await res.text();
-
-      const blob = new Blob([text], { type: "application/json;charset=utf-8" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = DEMO_FILE_NAME;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 3000);
-    }catch(e){
-      alert("未找到示范模板文件：\\n" +
-            "请把同目录的 JSON 文件放在此 HTML 旁边：\\n" +
-            "  " + DEMO_FILE_NAME + "\\n\\n" +
-            "然后刷新页面再点“下载示范模板”。");
+  // 内置示范模板（你可以根据需要调整内容）
+  const DEMO_TEMPLATE = {
+    "meta": {
+      "name": "BanruoUI 最小示范模板",
+      "version": "1.0",
+      "description_zh": "一个基础的提示词分类包示例，包含画风、镜头、质量修饰词。适合快速测试工具流。",
+      "author": "BanruoUI 示例"
+    },
+    "globals": {
+      "header_en": "masterpiece, best quality, ultra detailed, high resolution",
+      "footer_en": "sharp focus, vibrant colors, cinematic lighting",
+      "negative_en": "blurry, lowres, deformed, ugly, bad anatomy, watermark"
+    },
+    "categories": [
+      {
+        "key": "art_style",
+        "title_zh": "画风",
+        "title_en": "Art Style",
+        "default_selected_ids": ["style_1"],
+        "options": [
+          {
+            "id": "style_1",
+            "label_zh": "赛博朋克",
+            "label_en": "Cyberpunk",
+            "prompt_en": "cyberpunk aesthetic, neon lights, rainy streets, holographic ads, futuristic cityscape",
+            "notes_zh": "适合夜景、科技感强的场景"
+          },
+          {
+            "id": "style_2",
+            "label_zh": "油画风格",
+            "label_en": "Oil Painting",
+            "prompt_en": "oil painting style, textured brush strokes, rich colors, classical art influence",
+            "notes_zh": "经典艺术感，适合肖像或风景"
+          }
+        ]
+      },
+      {
+        "key": "camera_angle",
+        "title_zh": "镜头角度",
+        "title_en": "Camera Angle",
+        "default_selected_ids": ["angle_1"],
+        "options": [
+          {
+            "id": "angle_1",
+            "label_zh": "广角低角度",
+            "label_en": "Wide Low Angle",
+            "prompt_en": "wide angle, low angle shot, dramatic perspective, looking up",
+            "notes_zh": "增加宏大感"
+          }
+        ]
+      },
+      {
+        "key": "quality",
+        "title_zh": "质量修饰",
+        "title_en": "Quality Enhancers",
+        "default_selected_ids": ["qual_1"],
+        "options": [
+          {
+            "id": "qual_1",
+            "label_zh": "极致细节",
+            "label_en": "Extreme Detail",
+            "prompt_en": "highly detailed, intricate, 8k, sharp focus",
+            "notes_zh": "通用提升质量"
+          }
+        ]
+      }
+    ],
+    "editor": {
+      "fields": [
+        {
+          "key": "free_desc",
+          "default": "",
+          "label_zh": "自由描述",
+          "placeholder": "额外英文描述..."
+        }
+      ]
     }
-  }
+  };
 
-  // Remove old listeners by re-binding via onclick
-  btn.onclick = downloadExternalDemoTemplate;
+  btn.addEventListener("click", function(){
+    // 直接下载内置模板
+    const text = JSON.stringify(DEMO_TEMPLATE, null, 2);
+    const blob = new Blob([text], {type: "application/json;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = DEMO_FILE_NAME;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    setProjStatus("已下载内置示范模板","ok");
+    setSaveStatus("示范模板已下载，可直接导入测试","ok");
+  });
 })();
 
 </script>
